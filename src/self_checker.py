@@ -44,6 +44,7 @@ class SelfChecker:
             "文档中未找到", "未提及", "没有提到",
         ]
         answer_refused = any(p in answer_text for p in refuse_phrases)
+        avg_score = sum(r.score for r in retrieved) / len(retrieved) if retrieved else 0
 
         if not has_retrieved:
             return CheckResult(
@@ -76,10 +77,7 @@ class SelfChecker:
         # 字符级重叠率
         overlap = len(answer_words & retrieval_words) / len(answer_words) if answer_words else 0
 
-        # 4. 检索分数
-        avg_score = sum(r.score for r in retrieved) / len(retrieved) if retrieved else 0
-
-        # 5. 综合判断
+        # 4. 综合判断
         has_evidence = overlap > 0.3 or avg_score > 0.4
         possible_hallucination = overlap < self.hallucination_threshold and avg_score < 0.3
         should_refuse = not has_evidence and avg_score < self.hallucination_threshold
