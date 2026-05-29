@@ -1,0 +1,11 @@
+config.yaml
+.env
+__pycache__/
+*.pyc
+.venv/
+venv/
+data/parsed/
+*.egg-info/
+dist/
+.pytest_cache/
+.DS_Store
