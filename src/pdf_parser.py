@@ -1,4 +1,4 @@
-"""PDF 解析模块 — 判断扫描件 + PaddleOCR 识别"""
+"""PDF 解析模块 — 判断扫描件 + tesseract OCR 识别"""
 import os
 import logging
 from pathlib import Path

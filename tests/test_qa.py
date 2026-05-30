@@ -98,8 +98,17 @@ def test_empty_question():
     """空问题"""
     agent = get_agent()
     result = agent.ask("")
-    assert "error" in result or len(result.get("answer", "")) < 5
-    # 不应崩溃
+    assert len(result.get("answer", "")) == 0
+    assert result["self_check"]["should_refuse"] is True
+
+
+def test_long_question():
+    """超长问题（500字）"""
+    agent = get_agent()
+    q = "请详细说明" + "键的技术要求" * 80  # 约 500 字
+    result = agent.ask(q)
+    assert "error" not in result, result.get("error")
+    assert len(result["answer"]) > 0
 
 
 def test_source_pages():

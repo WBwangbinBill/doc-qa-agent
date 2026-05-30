@@ -6,7 +6,7 @@
 
 | 挑战 | 应对 |
 |------|------|
-| 扫描件无文本层 | PaddleOCR 识别 |
+| 扫描件无文本层 | tesseract OCR 识别 |
 | 含表格数据 | 表格区域检测 + 结构化提取 |
 | 条款编号需保留 | 分块时保留编号 + 页码信息 |
 | OCR 可能有错误 | 检索时容忍部分匹配 |
@@ -16,18 +16,19 @@
 
 ```
 ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐
-│ PDF 输入  │ →  │ OCR 解析  │ →  │ 文本分块  │ →  │ 向量入库  │
+│ PDF 输入  │ →  │OCR 解析   │ →  │ 文本分块  │ →  │ 向量入库  │
 └──────────┘    └──────────┘    └──────────┘    └──────────┘
                      │                                 │
-                ┌────┴────┐                      ChromaDB
-                │ 表格提取  │                         │
+                ┌────┴────┐                  内存向量 + BM25
+                │ 表格提取  │                     (pickle)
                 └─────────┘                           │
                                                      ↓
 ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐
-│ 用户问题  │ →  │ 语义检索  │ →  │ LLM 生成  │ →  │ 答案自检  │
+│ 用户问题  │ →  │ 混合检索  │ →  │ LLM 生成  │ →  │ 答案自检  │
 └──────────┘    └──────────┘    └──────────┘    └──────────┘
                      │               │               │
-                ChromaDB       DeepSeek API      依据/幻觉/拒答
+            语义相似度+BM25   Ollama/DeepSeek   LLM判断 依据/幻觉/拒答
+            条件启用策略       OpenAI兼容接口
 ```
 
 ## 三、数据流
@@ -35,11 +36,11 @@
 ### 3.1 入库流程
 
 ```
-PDF → PaddleOCR(page by page)
+PDF → tesseract OCR(page by page)
   → 正文(按段落) + 表格(按行列) + 条款编号
-  → chunk(每段 ≤ 500 字, 保留页码+编号)
-  → Embedding(BGE 1024维)
-  → ChromaDB(metadata: page, type, section_id)
+  → chunk(每段 ≤ 300 字, 章节强制切分, 页码前缀)
+  → BGE Embedding(1024维) + jieba分词 BM25 索引
+  → pickle 缓存到 data/parsed/
 ```
 
 ### 3.2 问答流程
@@ -47,13 +48,12 @@ PDF → PaddleOCR(page by page)
 ```
 用户问题
   → Embedding 向量化
-  → ChromaDB 检索 top_k=5
+  → 条件混合检索:
+     - max_emb ≥ 0.45 → 纯语义检索 (top_k=5, threshold=0.38)
+     - max_emb < 0.45 → 0.7×语义 + 0.3×BM25 混合兜底
   → 构建 prompt: 问题 + 检索片段 + 页码
-  → DeepSeek LLM 生成答案
-  → 自检:
-     - 是否有检索片段支撑？
-     - 是否可能幻觉？
-     - 是否需要拒答？
+  → Ollama/DeepSeek LLM 生成答案
+  → LLM 自检: 是否有依据？是否幻觉？是否拒答？
   → 返回: {answer, sources, self_check}
 ```
 
@@ -61,10 +61,11 @@ PDF → PaddleOCR(page by page)
 
 | 组件 | 选择 | 原因 |
 |------|------|------|
-| OCR | PaddleOCR | 中文识别好、pip 安装、免费 |
-| 向量库 | ChromaDB | 轻量、无服务端、适合原型 |
-| Embedding | BGE-large-zh-v1.5 | 中文最优、1024维 |
-| LLM | DeepSeek API | 已有 Key、Chat Completions 兼容 |
+| OCR | tesseract | 轻量, brew安装, 中文支持, 无需GPU |
+| 向量检索 | 内存余弦相似度 + BM25 | 零外部依赖, 条件混合策略, pickle持久化 |
+| Embedding | BGE-large-zh-v1.5 (可配) | 中文最优, 1024维; 支持切换MiniLM等 |
+| LLM | Ollama/DeepSeek (OpenAI兼容) | 灵活切换本地/云端, Chat Completions兼容 |
+| 分词 | jieba | BM25 关键词索引 |
 | 框架 | 无框架 | 保持简单、可解释 |
 
 ## 五、关键取舍

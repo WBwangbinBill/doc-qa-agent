@@ -28,8 +28,8 @@ self_check:
   hallucination_threshold: 0.2
 
 chunking:
-  max_chunk_size: 500
-  overlap: 50
+  max_chunk_size: 300
+  overlap: 80
 
 pdf:
   input_dir: "data"
