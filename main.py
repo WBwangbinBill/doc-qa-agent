@@ -106,7 +106,16 @@ class DocQAAgent:
             return {"error": "知识库未构建，请先调用 build_knowledge_base()"}
 
         if not question.strip():
-            return {"error": "请输入问题"}
+            return {
+                "question": question,
+                "answer": "",
+                "sources": [],
+                "self_check": {
+                    "has_evidence": False, "possible_hallucination": False,
+                    "should_refuse": True, "confidence": 0.0, "reason": "输入为空",
+                },
+                "retrieved_count": 0,
+            }
 
         # 检索
         retrieved = self.retriever.retrieve(question)

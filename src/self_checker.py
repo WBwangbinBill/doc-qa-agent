@@ -72,12 +72,12 @@ class SelfChecker:
                 reason="检索无结果"
             )
 
-        # 快速路径：明确拒答短语 + 短答案
+        # 快速路径：答案含拒答短语
         refuse_phrases = [
             "未找到相关信息", "没有相关信息", "无法找到",
             "文档中未找到", "未提及", "没有提到",
         ]
-        if any(p in answer_text for p in refuse_phrases) and len(answer_text) < 30:
+        if any(p in answer_text for p in refuse_phrases):
             return CheckResult(
                 has_evidence=False, possible_hallucination=False,
                 should_refuse=True, confidence=0.9,
