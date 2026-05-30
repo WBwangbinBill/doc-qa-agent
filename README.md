@@ -54,10 +54,12 @@ python -m pytest tests/test_qa.py -v
 ## 设计文档
 
 详见 [docs/](docs/) 目录：
-- [架构设计](docs/design.md) — 架构、数据流、取舍
-- [模块说明](docs/modules.md) — 每个模块的输入/输出/逻辑
-- [测试计划](docs/test-plan.md) — 10 个用例 + 评估指标
-- [AI 使用说明](docs/ai-usage.md) — AI 辅助方式 + 校验方法
+- [架构设计](docs/架构设计-design.md) — 架构、数据流、取舍
+- [模块说明](docs/模块说明-modules.md) — 每个模块的输入/输出/逻辑
+- [测试计划](docs/测试计划-test-plan.md) — 10 个用例 + 评估指标
+- [测试报告](docs/测试报告-test-report.md) — 优化前后对比 + BM25混合检索
+- [AI 使用说明](docs/AI使用说明-ai-usage.md) — AI 辅助方式 + 校验方法
+- [演示脚本](docs/演示脚本-demo-script.md) — 演示视频录制指南
 
 ## 技术栈
 
@@ -91,10 +93,12 @@ doc-qa-agent/
 │   └── test_qa.py
 ├── docs/
 │   ├── README.md
-│   ├── design.md
-│   ├── modules.md
-│   ├── test-plan.md
-│   └── ai-usage.md
+│   ├── 架构设计-design.md
+│   ├── 模块说明-modules.md
+│   ├── 测试计划-test-plan.md
+│   ├── 测试报告-test-report.md
+│   ├── AI使用说明-ai-usage.md
+│   └── 演示脚本-demo-script.md
 └── data/
     └── GBT 1568-2008 键 技术条件.pdf
 ```

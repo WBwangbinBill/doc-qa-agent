@@ -20,7 +20,7 @@ embedding:
 
 retrieval:
   top_k: 5
-  score_threshold: 0.3
+  score_threshold: 0.38
 
 self_check:
   enabled: true

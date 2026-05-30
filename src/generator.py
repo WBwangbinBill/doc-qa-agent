@@ -21,13 +21,13 @@ class Answer:
 class Generator:
     """基于 LLM 的答案生成器"""
 
-    PROMPT_TEMPLATE = """根据以下文档内容回答问题。请严格遵守规则：
+    PROMPT_TEMPLATE = """根据以下文档内容回答问题。请仔细阅读所有片段后再判断。
 
 规则：
-1. 如果文档中有相关信息，请准确回答并引用来源页码
-2. 如果文档中没有相关信息，请明确说"文档中未找到相关信息"，不要编造
-3. 如果问题涉及表格数据，请以结构化方式呈现
-4. 回答简洁准确，不要添加文档中没有的信息
+1. 仔细检查每个片段，文档中只要有一个片段包含相关信息就应回答
+2. 只有所有片段都不包含相关信息时，才说"文档中未找到相关信息"
+3. 回答时引用具体内容和来源页码，不要编造
+4. 回答简洁准确
 
 文档内容：
 {context}
@@ -55,12 +55,10 @@ class Generator:
                 sources=[],
             )
 
-        # 构建 context（含页码标注）
+        # 构建 context：按页码排序，帮助 LLM 理解文档逻辑
+        top_chunks = sorted(retrieved, key=lambda c: (c.page_num, c.score))
         context_parts = []
-        seen_pages = set()
-        for i, chunk in enumerate(retrieved):
-            if chunk.page_num not in seen_pages:
-                seen_pages.add(chunk.page_num)
+        for i, chunk in enumerate(top_chunks):
             context_parts.append(
                 f"[片段{i+1}] (第{chunk.page_num}页, 相关度{chunk.score:.2f})\n{chunk.content}"
             )
@@ -77,7 +75,7 @@ class Generator:
             )
             answer_text = response.choices[0].message.content.strip()
 
-            # 构建来源列表
+            # 构建来源列表（所有检索结果，不只是 top 3）
             sources = []
             for chunk in retrieved:
                 sources.append({

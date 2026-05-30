@@ -19,29 +19,35 @@ class Chunk:
     metadata: dict = field(default_factory=dict)
 
 
+_SECTION_RE = re.compile(
+    r'^\s*(第[一二三四五六七八九十\d]+[章节条]|\d+(?:\.\d+)*)\s+\S'
+)
+
+
 def chunk_documents(pages: list[Page], tables: list[Table], config: dict) -> list[Chunk]:
     """
     将解析后的页面和表格分块。
 
     策略：
-    - 正文：按段落切分，每块 ≤ max_chunk_size
+    - 正文：先按双换行→单换行→硬切 逐级切分
+    - 超长段落在 max_chunk_size 处硬切分
     - 表格：独立成块
     - 条款编号：正则匹配保留
     """
     chunk_cfg = config.get("chunking", {})
-    max_size = chunk_cfg.get("max_chunk_size", 500)
-    overlap = chunk_cfg.get("overlap", 50)
+    max_size = chunk_cfg.get("max_chunk_size", 300)
+    overlap = chunk_cfg.get("overlap", 80)
 
     chunks = []
 
-    # 正文分块
     for page in pages:
         text = page.full_text
         if not text.strip():
             continue
 
-        # 按双换行分段落
-        paragraphs = re.split(r'\n\s*\n', text)
+        # 逐级切分段落
+        paragraphs = _split_text(text, max_size)
+
         current_chunk = ""
         current_start_page = page.page_num
 
@@ -50,15 +56,14 @@ def chunk_documents(pages: list[Page], tables: list[Table], config: dict) -> lis
             if not para:
                 continue
 
-            # 提取条款编号
             clause_id = _extract_clause_id(para)
 
             if len(current_chunk) + len(para) > max_size and current_chunk:
                 chunks.append(Chunk(
-                    content=current_chunk.strip(),
+                    content=f"[第{current_start_page}页] {current_chunk.strip()}",
                     page_num=current_start_page,
-                    chunk_type="clause" if clause_id else "text",
-                    section_id=clause_id,
+                    chunk_type="text",
+                    section_id=_extract_clause_id(current_chunk),
                     metadata={"page": current_start_page},
                 ))
                 # overlap: 保留最后 overlap 字
@@ -76,7 +81,7 @@ def chunk_documents(pages: list[Page], tables: list[Table], config: dict) -> lis
         # 最后一块
         if current_chunk.strip():
             chunks.append(Chunk(
-                content=current_chunk.strip(),
+                content=f"[第{current_start_page}页] {current_chunk.strip()}",
                 page_num=current_start_page,
                 chunk_type="text",
                 metadata={"page": current_start_page},
@@ -91,8 +96,68 @@ def chunk_documents(pages: list[Page], tables: list[Table], config: dict) -> lis
             metadata={"page": table.page_num, "type": "table"},
         ))
 
-    logger.info(f"分块完成，共 {len(chunks)} 块 (正文 {len([c for c in chunks if c.chunk_type != 'table'])} + 表格 {len([c for c in chunks if c.chunk_type == 'table'])})")
+    text_count = sum(1 for c in chunks if c.chunk_type != "table")
+    table_count = sum(1 for c in chunks if c.chunk_type == "table")
+    logger.info(f"分块完成，共 {len(chunks)} 块 (正文 {text_count} + 表格 {table_count})")
     return chunks
+
+
+def _split_text(text: str, max_size: int) -> list[str]:
+    """逐级切分文本为段落列表：先双换行→单换行→硬切"""
+    # 1. 尝试双换行
+    parts = re.split(r'\n\s*\n', text)
+    if all(len(p) <= max_size for p in parts):
+        return parts
+
+    # 2. 对超长段落进一步用单换行切分
+    result = []
+    for part in parts:
+        if len(part) <= max_size:
+            result.append(part)
+        else:
+            lines = part.split('\n')
+            result.extend(_merge_lines(lines, max_size))
+    return result
+
+
+def _merge_lines(lines: list[str], max_size: int) -> list[str]:
+    """将行合并为 ≤ max_size 的块，在章节标题处强制切分"""
+    result = []
+    current = ""
+    for line in lines:
+        line = line.strip()
+        if not line:
+            if current:
+                result.append(current)
+                current = ""
+            continue
+
+        # 遇到章节标题 → 结束当前 chunk，开启新 chunk
+        if _is_section_header(line) and current:
+            result.append(current)
+            current = line
+            continue
+
+        if len(current) + len(line) > max_size:
+            if current:
+                result.append(current)
+            # 单行超长：硬切分
+            if len(line) > max_size:
+                for i in range(0, len(line), max_size - 40):
+                    result.append(line[i:i + max_size - 40])
+            else:
+                current = line
+        else:
+            current = current + "\n" + line if current else line
+
+    if current:
+        result.append(current)
+    return result
+
+
+def _is_section_header(text: str) -> bool:
+    """判断是否为章节标题行，如 '3 技术要求' '4.1 基本规则' '第5条'"""
+    return bool(_SECTION_RE.match(text))
 
 
 def _extract_clause_id(text: str) -> str:

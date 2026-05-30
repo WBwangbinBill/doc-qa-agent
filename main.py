@@ -43,7 +43,20 @@ class DocQAAgent:
         self._ready = False
 
     def build_knowledge_base(self, pdf_path: str) -> dict:
-        """解析 PDF 并构建知识库"""
+        """解析 PDF 并构建知识库（优先使用缓存）"""
+        cache_dir = self.config.get("pdf", {}).get("output_dir", "data/parsed")
+
+        # 尝试从缓存加载
+        if self.retriever.load(cache_dir, pdf_path):
+            self._ready = True
+            return {
+                "pages": len(set(c.page_num for c in self.retriever._chunks)),
+                "is_scanned": True,
+                "chunks": len(self.retriever._chunks),
+                "tables": sum(1 for c in self.retriever._chunks if c.chunk_type == "table"),
+                "cached": True,
+            }
+
         logger.info(f"开始解析 PDF: {pdf_path}")
 
         # 1. PDF 解析
@@ -74,6 +87,10 @@ class DocQAAgent:
 
         # 4. 建索引
         self.retriever.build_index(chunks)
+
+        # 5. 缓存
+        self.retriever.save(cache_dir, pdf_path)
+
         self._ready = True
 
         return {
@@ -98,7 +115,7 @@ class DocQAAgent:
         answer = self.generator.generate(question, retrieved)
 
         # 自检
-        check = self.checker.check(answer, retrieved)
+        check = self.checker.check(question, answer, retrieved)
 
         return {
             "question": question,
