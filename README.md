@@ -54,6 +54,7 @@ python -m pytest tests/test_qa.py -v
 ## 设计文档
 
 详见 [docs/](docs/) 目录：
+- [作业说明](docs/作业说明-assignment.md) — 题目要求、测试用例、评估维度、提交清单
 - [架构设计](docs/架构设计-design.md) — 架构、数据流、取舍
 - [模块说明](docs/模块说明-modules.md) — 每个模块的输入/输出/逻辑
 - [测试计划](docs/测试计划-test-plan.md) — 10 个用例 + 评估指标
@@ -93,6 +94,7 @@ doc-qa-agent/
 │   └── test_qa.py
 ├── docs/
 │   ├── README.md
+│   ├── 作业说明-assignment.md
 │   ├── 架构设计-design.md
 │   ├── 模块说明-modules.md
 │   ├── 测试计划-test-plan.md
